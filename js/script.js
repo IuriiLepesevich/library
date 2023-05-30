@@ -1,7 +1,69 @@
-const myLibrary = [];
-const form = document.querySelector("form");
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  setDoc,
+  deleteDoc,
+  updateDoc,
+  doc,
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-lite.js";
 
-// New branch
+// TODO: Replace the following with your app's Firebase project configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyByN-FR4_GkOhERuj3-k4cSj1Zvv5ar8B0",
+  authDomain: "library-f54cf.firebaseapp.com",
+  projectId: "library-f54cf",
+  storageBucket: "library-f54cf.appspot.com",
+  messagingSenderId: "469667089894",
+  appId: "1:469667089894:web:50b6d8e8fcce744e8ada27",
+  measurementId: "G-GR3ZNK8585",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+async function getBooks(database) {
+  const booksCol = collection(database, "books");
+  const booksSnapshot = await getDocs(booksCol);
+  const booksList = booksSnapshot.docs.map((doc) => doc.data());
+  return booksList;
+}
+
+async function saveBook(Book) {
+  try {
+    await setDoc(doc(db, "books", Book.title), {
+      title: Book.title,
+      author: Book.author,
+      pages: Book.pages,
+      isRead: Book.isRead,
+    });
+  } catch (error) {
+    console.error("Error writing new message to Firebase Database", error);
+  }
+}
+
+async function toggleIsRead(targetBookName, newIsRead) {
+  try {
+    await updateDoc(doc(db, "books", targetBookName), {
+      isRead: newIsRead,
+    });
+  } catch (error) {
+    console.error("Error editing isRead", error);
+  }
+  drawTable();
+}
+
+async function deleteBook(targetBookName) {
+  try {
+    await deleteDoc(doc(db, "books", targetBookName));
+  } catch (error) {
+    console.error("Error deleting isRead", error);
+  }
+  drawTable();
+}
+
+const form = document.querySelector("form");
 
 class Book {
   constructor(title, author, pages, isRead) {
@@ -19,9 +81,10 @@ function clearTable() {
   }
 }
 
-function drawTable() {
+async function drawTable() {
   clearTable();
-  myLibrary.forEach((book, index) => {
+  const bookList = await getBooks(db);
+  bookList.forEach((book) => {
     const newTableRow = document.createElement("tr");
     Object.entries(book).forEach(([key, value]) => {
       const newTableData = document.createElement("td");
@@ -29,6 +92,7 @@ function drawTable() {
         const toggleStatusButton = document.createElement("input");
         toggleStatusButton.type = "button";
         toggleStatusButton.classList.add("status");
+        toggleStatusButton.setAttribute("id", book.title);
         let newContent = "";
         if (value) {
           newContent = "Have read";
@@ -37,9 +101,8 @@ function drawTable() {
           newContent = "Not read yet";
         }
         toggleStatusButton.value = newContent;
-        toggleStatusButton.addEventListener("click", () => {
-          myLibrary[index].isRead = !myLibrary[index].isRead;
-          drawTable();
+        toggleStatusButton.addEventListener("click", (e) => {
+          toggleIsRead(e.target.id, !value);
         });
         newTableData.appendChild(toggleStatusButton);
       } else {
@@ -53,9 +116,9 @@ function drawTable() {
     newDeleteButton.type = "button";
     newDeleteButton.value = "Delete";
     newDeleteButton.classList.add("delete");
-    newDeleteButton.addEventListener("click", () => {
-      myLibrary.splice(index, 1);
-      drawTable();
+    newDeleteButton.setAttribute("id", book.title);
+    newDeleteButton.addEventListener("click", (e) => {
+      deleteBook(e.target.id);
     });
     newTableData.appendChild(newDeleteButton);
     newTableRow.appendChild(newTableData);
@@ -65,8 +128,8 @@ function drawTable() {
   });
 }
 
-function addBookToLibrary(title, author, pages, isRead) {
-  myLibrary.push(new Book(title, author, pages, isRead));
+async function addBookToLibrary(title, author, pages, isRead) {
+  await saveBook(new Book(title, author, pages, isRead));
   drawTable();
 }
 
@@ -80,17 +143,11 @@ function collectData() {
     titleField.value,
     authorField.value,
     pagesField.value,
-    isReadField.value,
+    isReadField.value === "true",
   ];
 }
 
-addBookToLibrary("Hobbit", "Tolkien J.R.R.", 293, true);
-addBookToLibrary("To Kill a Mockingbird", "Harper Lee", 281, false);
-addBookToLibrary("The Catcher in the Rye", "J.D. Salinger", 224, true);
-addBookToLibrary("Pride and Prejudice", "Jane Austen", 279, false);
-addBookToLibrary("The Great Gatsby", "F. Scott Fitzgerald", 218, true);
-addBookToLibrary("Animal Farm", "George Orwell", 112, true);
-addBookToLibrary("The Lord of the Rings", "J.R.R. Tolkien", 1178, false);
+drawTable();
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
