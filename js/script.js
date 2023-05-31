@@ -7,7 +7,10 @@ import {
   deleteDoc,
   updateDoc,
   onSnapshot,
+  query,
+  orderBy,
   doc,
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
 // TODO: Replace the following with your app's Firebase project configuration
@@ -32,8 +35,14 @@ async function getBooks(database) {
 }
 
 function loadBooks() {
-  onSnapshot(collection(db, "books"), async () => {
-    drawTable(await getBooks(db));
+  const booksQuery = query(
+    collection(getFirestore(), "books"),
+    orderBy("timestamp", "asc")
+  );
+  onSnapshot(booksQuery, async () => {
+    const booksSnapshot = await getDocs(booksQuery);
+    const booksList = booksSnapshot.docs.map((docArg) => docArg.data());
+    drawTable(booksList);
   });
 }
 
@@ -44,6 +53,7 @@ async function saveBook(Book) {
       author: Book.author,
       pages: Book.pages,
       isRead: Book.isRead,
+      timestamp: serverTimestamp(),
     });
   } catch (error) {
     console.error("Error writing new message to Firebase Database", error);
