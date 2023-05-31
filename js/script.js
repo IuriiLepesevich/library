@@ -6,8 +6,9 @@ import {
   setDoc,
   deleteDoc,
   updateDoc,
+  onSnapshot,
   doc,
-} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-lite.js";
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
 // TODO: Replace the following with your app's Firebase project configuration
 const firebaseConfig = {
@@ -28,6 +29,12 @@ async function getBooks(database) {
   const booksSnapshot = await getDocs(booksCol);
   const booksList = booksSnapshot.docs.map((doc) => doc.data());
   return booksList;
+}
+
+function loadBooks() {
+  onSnapshot(collection(db, "books"), async () => {
+    drawTable(await getBooks(db));
+  });
 }
 
 async function saveBook(Book) {
@@ -51,7 +58,6 @@ async function toggleIsRead(targetBookName, newIsRead) {
   } catch (error) {
     console.error("Error editing isRead", error);
   }
-  drawTable();
 }
 
 async function deleteBook(targetBookName) {
@@ -60,7 +66,6 @@ async function deleteBook(targetBookName) {
   } catch (error) {
     console.error("Error deleting isRead", error);
   }
-  drawTable();
 }
 
 const form = document.querySelector("form");
@@ -81,47 +86,61 @@ function clearTable() {
   }
 }
 
-async function drawTable() {
+function createTd(data) {
+  const newTableData = document.createElement("td");
+  const newContent = document.createTextNode(`${data}`);
+  newTableData.appendChild(newContent);
+  return newTableData;
+}
+
+function createToggleStatusButton(bookTitle, isReadArg) {
+  const newTableData = document.createElement("td");
+  const toggleStatusButton = document.createElement("input");
+  toggleStatusButton.type = "button";
+  toggleStatusButton.classList.add("status");
+  toggleStatusButton.setAttribute("id", bookTitle);
+  let newContent = "";
+  if (isReadArg) {
+    newContent = "Have read";
+    toggleStatusButton.classList.add("read");
+  } else {
+    newContent = "Not read yet";
+  }
+  toggleStatusButton.value = newContent;
+  toggleStatusButton.addEventListener("click", (e) => {
+    toggleIsRead(e.target.id, !isReadArg);
+  });
+  newTableData.appendChild(toggleStatusButton);
+  return newTableData;
+}
+
+function createDeleteButton(bookTitle) {
+  const newTableData = document.createElement("td");
+  const newDeleteButton = document.createElement("input");
+  newDeleteButton.type = "button";
+  newDeleteButton.value = "Delete";
+  newDeleteButton.classList.add("delete");
+  newDeleteButton.setAttribute("id", bookTitle);
+  newDeleteButton.addEventListener("click", (e) => {
+    deleteBook(e.target.id);
+  });
+  newTableData.appendChild(newDeleteButton);
+  return newTableData;
+}
+
+async function drawTable(books) {
   clearTable();
-  const bookList = await getBooks(db);
+  const bookList = books || (await getBooks(db));
   bookList.forEach((book) => {
+    const { title, author, pages, isRead } = book;
     const newTableRow = document.createElement("tr");
-    Object.entries(book).forEach(([key, value]) => {
-      const newTableData = document.createElement("td");
-      if (key === "isRead") {
-        const toggleStatusButton = document.createElement("input");
-        toggleStatusButton.type = "button";
-        toggleStatusButton.classList.add("status");
-        toggleStatusButton.setAttribute("id", book.title);
-        let newContent = "";
-        if (value) {
-          newContent = "Have read";
-          toggleStatusButton.classList.add("read");
-        } else {
-          newContent = "Not read yet";
-        }
-        toggleStatusButton.value = newContent;
-        toggleStatusButton.addEventListener("click", (e) => {
-          toggleIsRead(e.target.id, !value);
-        });
-        newTableData.appendChild(toggleStatusButton);
-      } else {
-        const newContent = document.createTextNode(`${value}`);
-        newTableData.appendChild(newContent);
-      }
-      newTableRow.appendChild(newTableData);
-    });
-    const newTableData = document.createElement("td");
-    const newDeleteButton = document.createElement("input");
-    newDeleteButton.type = "button";
-    newDeleteButton.value = "Delete";
-    newDeleteButton.classList.add("delete");
-    newDeleteButton.setAttribute("id", book.title);
-    newDeleteButton.addEventListener("click", (e) => {
-      deleteBook(e.target.id);
-    });
-    newTableData.appendChild(newDeleteButton);
-    newTableRow.appendChild(newTableData);
+
+    newTableRow.appendChild(createTd(title));
+    newTableRow.appendChild(createTd(author));
+    newTableRow.appendChild(createTd(pages));
+
+    newTableRow.appendChild(createToggleStatusButton(title, isRead));
+    newTableRow.appendChild(createDeleteButton(title));
 
     const table = document.querySelector("table");
     table.appendChild(newTableRow);
@@ -130,7 +149,6 @@ async function drawTable() {
 
 async function addBookToLibrary(title, author, pages, isRead) {
   await saveBook(new Book(title, author, pages, isRead));
-  drawTable();
 }
 
 function collectData() {
@@ -155,3 +173,5 @@ form.addEventListener("submit", (e) => {
   addBookToLibrary(fieldData[0], fieldData[1], fieldData[2], fieldData[3]);
   form.reset();
 });
+
+loadBooks();
